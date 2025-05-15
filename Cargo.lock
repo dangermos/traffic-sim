@@ -39,7 +39,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
-name = "car"
+name = "cars_and_roads"
 version = "0.1.0"
 dependencies = [
  "macroquad",
@@ -164,6 +164,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "64b1d96218903768c1ce078b657c0d5965465c95a60d2682fd97443c9d2483dd"
 
 [[package]]
+name = "main_render"
+version = "0.1.0"
+dependencies = [
+ "cars_and_roads",
+ "macroquad",
+ "render",
+]
+
+[[package]]
 name = "malloc_buf"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -241,8 +250,7 @@ checksum = "5a651516ddc9168ebd67b24afd085a718be02f8858fe406591b013d101ce2f40"
 name = "render"
 version = "0.1.0"
 dependencies = [
- "car",
- "macroquad",
+ "cars_and_roads",
 ]
 
 [[package]]

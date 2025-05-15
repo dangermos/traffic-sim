@@ -1,3 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["cars_and_roads", "main_render"]
+members = [
+    "cars_and_roads",
+    "main_render", 
+    "render_functions"
+    ]
