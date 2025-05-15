@@ -51,7 +51,7 @@ impl Car {
         self.center
     }
 
-    pub fn rotate_car(&mut self, rotation: f32) -> () {
+    pub fn rotate_car(&mut self, rotation: f32) {
         
         self.heading += rotation
         

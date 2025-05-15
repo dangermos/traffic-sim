@@ -1,6 +1,6 @@
-use cars_and_roads::{Car, Vec2, Color, draw_triangle};
+use cars_and_roads::{draw_triangle, draw_line, Car, Color, Road, Vec2};
 
-fn draw_car(car: &Car, color: Color) {
+pub fn draw_car(car: &Car, color: Color) {
 
     let width = car.get_width();
     let height = car.get_height();
@@ -33,3 +33,11 @@ fn draw_car(car: &Car, color: Color) {
     
 
 }
+
+pub fn draw_road(road: &Road, color: Color) {
+    for pair in road.points.windows(2) {
+        draw_line(pair[0].x, pair[0].y, pair[1].x, pair[1].y, 4.0, color);
+    }
+}
+
+

@@ -10,3 +10,4 @@ path = "src/lib.rs"
 
 [dependencies]
 macroquad = "0.4.14"
+rand = "0.9.1"
