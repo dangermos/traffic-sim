@@ -1,8 +1,10 @@
+use std::ops::Index;
 
 use macroquad::math::Vec2;
 use rand::Rng;
 pub type RoadID = i32;
 
+#[derive(Clone, Debug)]
 pub struct Road {
 
     pub id: RoadID,
@@ -40,6 +42,57 @@ impl Road {
         }
     }
 
+}
+
+pub struct RoadList {
+    roads: Vec<Road>,
+}
+
+impl RoadList {
+    /// Initialize a roadlist
+    /// Takes an array of roads
+    pub fn new(road: Option<Vec<Road>>) -> Self {
+        
+        if let Some(road) = road {
+
+        RoadList {
+            roads: Vec::from_iter(road)
+            }
+        }
+        else {
+            RoadList {
+                roads: Vec::new(),
+            }
+        }
+    
+    }
+
+    pub fn add_road(&mut self, road: Road) {
+        self.roads.push(road);
+    }
+
+    pub fn get_roads(&self) -> &Vec<Road> {
+        &self.roads
+    }
+}
+
+/// This allows RoadList to be iterated on multiple times, not consuming it.
+impl<'a> IntoIterator for &'a RoadList {
+    type Item = &'a Road;
+    type IntoIter = std::slice::Iter<'a, Road>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.roads.iter()
+    }
+}
+
+impl Index<RoadID> for RoadList {
+    type Output = Road;
+    fn index(&self, index: RoadID) -> &Self::Output {
+        self.roads.iter()
+                    .find(|road| road.id == index)
+                    .expect("ID Not Found")
+    }
 }
 
 /// Helper Function to populate points Vector
