@@ -1,11 +1,11 @@
-use cars_and_roads::{draw_triangle, draw_line, Car, Color, Road, Vec2};
+use cars_and_roads::{draw_circle, draw_line, draw_triangle, draw_triangle_lines, road::Node, Car, Color, Road, Vec2, PURPLE, RED, WHITE};
 
-pub fn draw_car(car: &Car, color: Color) {
+pub fn draw_car(car: &Car, color: Color, debug: bool) {
 
     let width = car.get_width();
     let height = car.get_height();
 
-    let angle_rad = car.get_direction().to_radians();
+    let angle_rad = car.get_direction() - std::f32::consts::FRAC_PI_2;
     let half_w = width / 2.0;
     let half_h = height / 2.0;
 
@@ -28,7 +28,29 @@ pub fn draw_car(car: &Car, color: Color) {
     draw_triangle(rotated[0], rotated[1], rotated[2], color);
     draw_triangle(rotated[2], rotated[3], rotated[0], color);
 
-
+    if debug {
+        let direction = Vec2::from_angle(car.get_direction()).normalize();
+        let speed = car.velocity.max(1.0); // prevent scaling to zero
+    
+        let arrow_length = 15.0 + speed * 1.5; // total arrow length
+        let tip_size = 4.0 + speed * 0.4;      // size of the arrowhead
+    
+        let start = car.position;
+        let tip = start + direction * arrow_length;
+    
+        // Draw the main arrow shaft
+        draw_line(start.x, start.y, tip.x, tip.y, 2.0, PURPLE);
+    
+        // Compute arrowhead triangle base corners
+        let perp = Vec2::new(-direction.y, direction.x); // 90° rotated vector
+        let base = tip - direction * (tip_size + 2.0);   // back off from tip a bit
+        let left = base + perp * tip_size;
+        let right = base - perp * tip_size;
+    
+        draw_triangle(tip, left, right, PURPLE);
+    }
+    
+    
 
     
 
@@ -38,6 +60,10 @@ pub fn draw_road(road: &Road, color: Color) {
     for pair in road.points.windows(2) {
         draw_line(pair[0].x, pair[0].y, pair[1].x, pair[1].y, 4.0, color);
     }
+}
+
+pub fn draw_node(node: &Node) {
+    draw_circle(node.position.x, node.position.y, 2.0, RED);
 }
 
 

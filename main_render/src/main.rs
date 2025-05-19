@@ -1,53 +1,81 @@
+
+
 use macroquad::prelude::*;
-use cars_and_roads::{car::CarList, road::{make_points, RoadList}, Car, Road};
-use render::{draw_car, draw_road};
+use cars_and_roads::{road::{Node, NodeID, generate_random_nodes, generate_random_roads}, Car, CarList, Road, RoadGraph, RoadID};
+use render::{draw_car, draw_node, draw_road};
 
 
 #[macroquad::main("Main Render")]
 async fn main() {
     
     //// INIT ////
+    
+    set_fullscreen(true);
 
-    const SCREEN_WIDTH: i32 = 800;
-    const SCREEN_HEIGHT: i32 = 600;
-    const CENTER: Vec2 = Vec2 {x: (SCREEN_WIDTH / 2) as f32, y: (SCREEN_HEIGHT / 2) as f32};
+    let SCREEN_WIDTH: f32 = 1920.0;
+    let SCREEN_HEIGHT: f32 = 1200.0;
+    let CENTER: Vec2 = Vec2 {x: SCREEN_WIDTH / 2.0, y: SCREEN_HEIGHT / 2.0};
+
+    // Nodes and Roads
+    /* 
+    let node1: Node = Node::new_node(NodeID(1), Vec2 { x: CENTER.x - 250.0, y: CENTER.y + 100.0 });
+    let node2: Node = Node::new_node(NodeID(2), Vec2 { x: CENTER.x + 150.0, y: CENTER.y - 100.0 });
+    let node3: Node = Node::new_node(NodeID(3), Vec2 { x: CENTER.x + 200.0, y: CENTER.y - 100.0 });
+
+    let road1: Road = Road::new_road(RoadID(1), node1, node2, 100, 60.0, false);
+    let road2: Road = Road::new_road(RoadID(2), node1, node3, 100, 60.0, false);
+    let road3: Road = Road::new_road(RoadID(3), node2, node3, 100, 60.0, false);
 
 
-    let car1 = Car::new(CENTER, Vec2::ZERO, 0.0);
-    let car2 = Car::new(Vec2 { x: CENTER.x + 1.0, y: CENTER.y - 10.0 }, Vec2::ZERO, 0.0);
+    let mut road_graph: RoadGraph = RoadGraph::new(vec![road1, road2, road3].into(), 
+                                                   vec![node1, node2, node3].into());
 
-    // make road points
-    let curves = make_points(CENTER, 3);
-    let curves2 = make_points(CENTER, 2);
+    */           
 
-    let road1: Road = Road::new_road(1, 1, 2, 30.0, 100, 60.0, curves, false);
+    let nodes = generate_random_nodes(5, SCREEN_WIDTH, SCREEN_HEIGHT);
+    let roads = generate_random_roads(5000, &nodes);
+    let road_graph = RoadGraph::new(roads.into(), nodes.into());
 
-    let road2: Road = Road::new_road(2, 1, 2, 10.0, 100, 60.0, curves2, false);
 
+    let num_cars = 4005;
+
+    let mut cars: CarList = CarList::new(
+        (0..num_cars)
+            .map(|i| Car::new_on_road(RoadID(i % 5000), &road_graph, 5.0))
+            .collect()
+    );
 
     // Arrays of game objects
 
-    // Roads are accessed by ID using RoadList[id]
-    let mut roads: RoadList = RoadList::new(vec![road1, road2].into());
+    // Roads are accessed by ID using RoadGraph[id]
     
-    let mut cars: CarList = CarList::new(vec![car1, car2].into());
 
 
-    
+    /* println!("The roads are {:?}\nThe nodes are {:?}", 
+    road_graph.get_roads().iter().map(|x| x.id).collect::<Vec<RoadID>>(),
+    road_graph.get_nodes().iter().map(|x| x.id).collect::<Vec<NodeID>>());
+    */
 
     //// Game Loop ////
     loop { 
 
         draw_fps();
-        for i in &roads {
-            draw_road(&i, WHITE);
+        for road in road_graph.get_roads() {
+            draw_road(road, WHITE);
+        }
+        
+        for node in road_graph.get_nodes() {
+            draw_node(node);
         }
 
         for i in &mut cars {
-            i.rotate_car(1.0);
-            draw_car(&i, RED);
 
-            println!("My Car ID is: {}\nI'm facing {} degrees!", i.get_id(), i.get_direction())
+            draw_car(&i, RED, true);
+
+            i.move_car_on_road(get_frame_time() * 10.0, &road_graph);
+
+
+            // println!("My Car ID is: {:?}\nI'm facing {} degrees!\nMy Current Position is {}\nI'm on road {:?}", i.get_id(), i.get_direction(), i.position, i.current_road);
 
         }
 
