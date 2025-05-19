@@ -180,6 +180,9 @@ impl CarList {
     pub fn get_cars(&self) -> &Vec<Car> {
         &self.cars
     }
+    pub fn get_cars_mut(&mut self) ->&mut Vec<Car> {
+        &mut self.cars
+    }
 }
 
 impl <'a>IntoIterator for &'a mut CarList {

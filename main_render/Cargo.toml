@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 macroquad = "0.4.14"
+rayon = "1.10.0"
 cars_and_roads = {path = "../cars_and_roads"}
 render = {path = "../render_functions"}
 

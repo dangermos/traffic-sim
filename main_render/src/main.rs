@@ -1,5 +1,5 @@
 
-
+use rayon::prelude::*;
 use macroquad::prelude::*;
 use cars_and_roads::{road::{Node, NodeID, generate_random_nodes, generate_random_roads}, Car, CarList, Road, RoadGraph, RoadID};
 use render::{draw_car, draw_node, draw_road};
@@ -37,7 +37,7 @@ async fn main() {
     let road_graph = RoadGraph::new(roads.into(), nodes.into());
 
 
-    let num_cars = 4005;
+    let num_cars = 40005;
 
     let mut cars: CarList = CarList::new(
         (0..num_cars)
@@ -60,13 +60,12 @@ async fn main() {
     loop { 
 
         draw_fps();
-        for road in road_graph.get_roads() {
-            draw_road(road, WHITE);
-        }
         
-        for node in road_graph.get_nodes() {
-            draw_node(node);
-        }
+        road_graph.get_roads().iter().for_each(|x| draw_road(x, WHITE));
+        
+        road_graph.get_nodes().iter().for_each(|x | draw_node(x));
+        
+        /* 
 
         for i in &mut cars {
 
@@ -78,10 +77,13 @@ async fn main() {
             // println!("My Car ID is: {:?}\nI'm facing {} degrees!\nMy Current Position is {}\nI'm on road {:?}", i.get_id(), i.get_direction(), i.position, i.current_road);
 
         }
+        */
 
+
+        cars.get_cars_mut().par_iter_mut().for_each(|car| car.move_car_on_road(0.3, &road_graph));
         
         
-        
+        cars.get_cars().iter().for_each(|x | draw_car(x, RED, true));
         
 
 
