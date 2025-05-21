@@ -1,11 +1,11 @@
 use std::{collections::HashMap, ops::Index};
 
-use macroquad::math::Vec2;
+use macroquad::{math::{Vec2}};
 use rand::Rng;
 
 
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Default)]
 pub struct NodeID (pub i32);
 
 impl From<i32> for NodeID {
@@ -29,7 +29,7 @@ impl Node {
 }
 
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Default)]
 pub struct RoadID (pub i32);
 #[derive(Clone, Debug)]
 /// A road is actually an edge between two Node objects
@@ -114,7 +114,7 @@ impl Road {
 pub struct RoadGraph {
     roads: Vec<Road>,
     nodes: Vec<Node>,
-    adjacency: HashMap<NodeID, Vec<RoadID>>,
+    adjacency: HashMap<NodeID, Vec<(NodeID, RoadID)>>,
 }
 
 
@@ -123,17 +123,25 @@ impl RoadGraph {
     /// Takes an array of roads
     
     pub fn new(roads: Option<Vec<Road>>, nodes: Option<Vec<Node>>) -> Self {
+
         let roads = roads.unwrap_or_default();
         let nodes = nodes.unwrap_or_default();
-        let mut adjacency: HashMap<NodeID, Vec<RoadID>> = HashMap::new();
-
-        /* for road in &roads {
-            adjacency
-                .entry(road.from)
-                .or_default()
-                .push(road.id); */
-
         
+
+
+        let mut adjacency: HashMap<NodeID, Vec<(NodeID, RoadID)>> = HashMap::new();
+
+        // h.into_iter().for_each(|(key, val)| adjacency.insert(key, val); );
+
+
+         for road in &roads {
+            adjacency
+                .entry(road.from.id) // from NodeID
+                .or_default()
+                .push((road.to.id, road.id)); // to (NodeID, using RoadID)
+         }
+        
+        println!("adj: {:?}", adjacency);
 
         RoadGraph {
             roads,

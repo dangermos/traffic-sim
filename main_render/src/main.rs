@@ -12,8 +12,13 @@ async fn main() {
     
     set_fullscreen(true);
 
-    let SCREEN_WIDTH: f32 = 1920.0;
-    let SCREEN_HEIGHT: f32 = 1200.0;
+
+    let SCREEN_WIDTH: f32 = 1080.0;
+    let SCREEN_HEIGHT: f32 = 1920.0;
+
+    println!("Width: {}\nHeight: {}", SCREEN_WIDTH, SCREEN_HEIGHT);
+
+
     let CENTER: Vec2 = Vec2 {x: SCREEN_WIDTH / 2.0, y: SCREEN_HEIGHT / 2.0};
 
     // Nodes and Roads
@@ -32,16 +37,20 @@ async fn main() {
 
     */           
 
-    let nodes = generate_random_nodes(5, SCREEN_WIDTH, SCREEN_HEIGHT);
-    let roads = generate_random_roads(5000, &nodes);
+    let num_nodes = 5;
+
+    let nodes = generate_random_nodes(num_nodes, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+    let num_roads = num_nodes;
+    let roads = generate_random_roads(num_roads, &nodes);
     let road_graph = RoadGraph::new(roads.into(), nodes.into());
 
 
-    let num_cars = 40005;
+    let num_cars = num_roads;
 
     let mut cars: CarList = CarList::new(
         (0..num_cars)
-            .map(|i| Car::new_on_road(RoadID(i % 5000), &road_graph, 5.0))
+            .map(|i| Car::new_on_road(RoadID(i % num_roads), &road_graph, 5.0))
             .collect()
     );
 
@@ -56,6 +65,7 @@ async fn main() {
     road_graph.get_nodes().iter().map(|x| x.id).collect::<Vec<NodeID>>());
     */
 
+    panic!();
     //// Game Loop ////
     loop { 
 
