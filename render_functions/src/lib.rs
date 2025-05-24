@@ -1,4 +1,4 @@
-use cars_and_roads::{draw_circle, draw_line, draw_triangle, draw_triangle_lines, road::Node, Car, Color, Road, Vec2, PURPLE, RED, WHITE};
+use cars_and_roads::{draw_circle, draw_line, draw_text, draw_triangle, road::Node, Car, Color, Road, Vec2, BLUE, PURPLE, RED, WHITE, PINK};
 
 pub fn draw_car(car: &Car, color: Color, debug: bool) {
 
@@ -56,14 +56,21 @@ pub fn draw_car(car: &Car, color: Color, debug: bool) {
 
 }
 
-pub fn draw_road(road: &Road, color: Color) {
+pub fn draw_road(road: &Road) {
+
+    let color = if road.one_way {PINK} else {WHITE};
+
+
     for pair in road.points.windows(2) {
         draw_line(pair[0].x, pair[0].y, pair[1].x, pair[1].y, 4.0, color);
     }
 }
 
-pub fn draw_node(node: &Node) {
+pub fn draw_node(node: &Node, debug: bool) {
     draw_circle(node.position.x, node.position.y, 2.0, RED);
+    if debug {
+        draw_text(&node.id.to_string(), node.position.x + 50.0, node.position.y + 10.0, 32.0, BLUE);
+    }
 }
 
 
