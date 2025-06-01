@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Index};
+use std::{collections::HashMap, ops::{Index, IndexMut}};
 
 use macroquad::{math::{Vec2}};
 use rand::Rng;
@@ -13,6 +13,21 @@ impl From<i32> for NodeID {
         NodeID(value)
     }
 }
+
+impl From<NodeID> for i32 {
+    fn from(value: NodeID) -> Self {
+        value.0
+    }
+}
+
+
+
+impl ToString for NodeID {
+    fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Node {
     pub id: NodeID,
@@ -37,54 +52,75 @@ pub struct RoadID (pub i32);
 pub struct Road {
 
     pub id: RoadID,
-    from: Node,
-    to: Node,
-    length: f32,
-    capacity: i32,
-    vehicles_on: i32,
+    pub from: Node,
+    pub to: Node,
+    pub length: f32,
+    pub capacity: i32,
+    pub vehicles_on: i32,
     pub speed_limit: f32,
-    one_way: bool,
-    traffic_density: f32,
+    pub one_way: bool,
+    pub traffic_density: f32,
 
     pub points: Vec<Vec2>, // this will expose any curves to the rendering function
 
 }
 
 /// Helper Function to populate points Vector
-fn make_points(curves: i32, from: Node, to: Node) -> Vec<Vec2> {
+fn make_points(curves: i32, from_node: Node, to_node: Node) -> Vec<Vec2> { // Assuming NodeWithPos has position
 
-    let mut rng = rand::rng();
-
-    let min_x = from.position.x.min(to.position.x);
-    let max_x = from.position.x.max(to.position.x);
-    let min_y = from.position.y.min(to.position.y);
-    let max_y = from.position.y.max(to.position.y);
-
-    let mut points: Vec<Vec2> = Vec::with_capacity((curves + 2) as usize); // +2 for from/to
-
-
-    for _ in 0..curves {
-        let x = rng.random_range(min_x..=max_x);
-        let y = rng.random_range(min_y..=max_y);
-        points.push(Vec2::new(x, y));
+    if curves == 0 {
+        return Vec::new();
     }
 
-    points
+    let mut rng = rand::rng(); // Standard way to get a RNG
 
+    let from_pos = from_node.position;
+    let to_pos = to_node.position;
+
+    let min_x = from_pos.x.min(to_pos.x);
+    let max_x = from_pos.x.max(to_pos.x);
+    let min_y = from_pos.y.min(to_pos.y);
+    let max_y = from_pos.y.max(to_pos.y);
+
+    let mut intermediate_points: Vec<Vec2> = Vec::with_capacity(curves as usize);
+
+    for _ in 0..curves {
+        // Ensure max >= min for random_range. If they are equal, it might panic or behave unexpectedly.
+        let x = if max_x > min_x { rng.random_range(min_x..max_x) } else { min_x };
+        let y = if max_y > min_y { rng.random_range(min_y..max_y) } else { min_y };
+        intermediate_points.push(Vec2::new(x, y));
+    }
+
+    // Sort points based on projection onto the from-to vector to make path more monotonic
+    let line_vec = to_pos - from_pos;
+    if line_vec.length_squared() > 0.001 { 
+        intermediate_points.sort_by(|a, b| {
+            let proj_a = (*a - from_pos).dot(line_vec);
+            let proj_b = (*b - from_pos).dot(line_vec);
+            proj_a.partial_cmp(&proj_b).unwrap_or(std::cmp::Ordering::Equal)
+        });
+    }
+
+
+    intermediate_points
 }
 
 
+
 impl Road {
-    pub fn new_road(id: RoadID, from: Node, to: Node, capacity: i32, speed_limit: f32, one_way: bool) -> Self{
+    pub fn new_road(id: RoadID, from: Node, to: Node, capacity: i32, speed_limit: f32) -> Self{
 
         let vehicles_on = 0;
         let density = vehicles_on as f32 / capacity as f32;
-        let length = 0.0; // TODO
+        let length = from.position.distance(to.position);
+
+        let one_way = rand::rng().random_range(1..=1000) < 200;
+
 
         let mut points: Vec<Vec2> = Vec::new();
         points.push(from.position);
 
-        let num_curves = rand::rng().random_range(1..5);
+        let num_curves = 3;
         
         points.extend(make_points(num_curves, from, to));
 
@@ -106,6 +142,39 @@ impl Road {
         }
     }
 
+    pub fn new_road_with_curves(id: RoadID, from: Node, to: Node, capacity: i32, speed_limit: f32, curves: i32) 
+    -> Self {
+
+        let vehicles_on = 0;
+        let density = vehicles_on as f32 / capacity as f32;
+        let length = from.position.distance(to.position);
+
+        let one_way = rand::rng().random_range(1..=1000) < 200;
+
+
+        let mut points: Vec<Vec2> = Vec::new();
+        points.push(from.position);
+
+        
+        points.extend(make_points(curves, from, to));
+
+        points.push(to.position);
+        
+
+
+        Road {
+            id,
+            from,
+            to,
+            length,
+            capacity,
+            vehicles_on,
+            speed_limit,
+            one_way,
+            points,
+            traffic_density: density,
+        }
+    }
 }
 
 /// A RoadGraph has an array representation of all the roads and nodes inserted into it.
@@ -114,7 +183,7 @@ impl Road {
 pub struct RoadGraph {
     roads: Vec<Road>,
     nodes: Vec<Node>,
-    adjacency: HashMap<NodeID, Vec<(NodeID, RoadID)>>,
+    pub adjacency: HashMap<NodeID, Vec<(NodeID, RoadID)>>,
 }
 
 
@@ -175,6 +244,10 @@ impl RoadGraph {
         &self.nodes
     }
 
+    pub fn get_adjacency(&self) -> HashMap<NodeID, Vec<(NodeID, RoadID)>>{
+        self.adjacency.clone()
+    }
+
 
 
 }
@@ -195,7 +268,7 @@ impl Index<RoadID> for RoadGraph {
     fn index(&self, index: RoadID) -> &Self::Output {
         self.roads.iter()
                     .find(|road| road.id == index)
-                    .expect("ID Not Found")
+                    .expect(&format!("ID {:?} Not Found", index))
     }
 }
 impl Index<NodeID> for RoadGraph {
@@ -204,6 +277,28 @@ impl Index<NodeID> for RoadGraph {
         self.nodes.iter()
                     .find(|node| node.id == index)
                     .expect("ID Not Found")
+    }
+}
+
+
+
+
+
+
+impl IndexMut<RoadID> for RoadGraph {
+
+    fn index_mut(&mut self, index: RoadID) -> &mut Self::Output {
+        self.roads.iter_mut()
+        .find(|road| road.id == index)
+        .expect("ID Not Found")  
+    }
+}
+
+impl IndexMut<NodeID> for RoadGraph {
+    fn index_mut(&mut self, index: NodeID) -> &mut Self::Output {
+        self.nodes.iter_mut()
+        .find(|node| node.id == index)
+        .expect("ID Not Found")
     }
 }
 
@@ -230,7 +325,6 @@ pub fn generate_random_roads(num: i32, nodes: &[Node]) -> Vec<Road> {
             to,
             rng.random_range(20..100),    // capacity
             rng.random_range(30.0..80.0), // speed_limit
-            true                       // one_way
         ));
     }
 
