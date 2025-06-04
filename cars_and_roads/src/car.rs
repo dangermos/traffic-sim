@@ -1,10 +1,9 @@
 use macroquad::math::Vec2;
-use rand::Rng;
+use rand::{random_range, rng, Rng};
 use crate::road::NodeID;
-use crate::{RoadID, RoadGraph, Road};
+use crate::{RoadID, RoadGraph};
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap, VecDeque};
-
+use std::collections::{BinaryHeap, HashMap};
 
 
 
@@ -147,6 +146,7 @@ impl From<i32> for CarID {
         CarID(value)
     }
 }
+#[derive(Clone, Debug)]
 
 pub struct Car {
     // Public
@@ -154,6 +154,7 @@ pub struct Car {
     pub velocity: f32,
     pub acceleration: Vec2,
     pub segment_index: usize,
+    pub destination: NodeID,
 
     // Private
     car_id: CarID,
@@ -165,9 +166,13 @@ pub struct Car {
     height: f32,
     center: Vec2,
     heading: f32,
+    color: (u8, u8, u8, u8),
 }
 
 impl Car {
+
+    /// Early Function - Not used
+    /* 
     pub fn new(position: Vec2, velocity: f32, heading: f32) -> Self {
             let width= 5.0;
             let height= 15.0;
@@ -185,48 +190,66 @@ impl Car {
             car_id: CarID::new_rand(),
             segment_index: 0,
             path: Vec::new(),
+            color: RED,
         }
     }
+    */
 
     /// Spawns a car on the specified road of a RoadGraph.
-    pub fn new_on_road(road: RoadID, road_graph: &mut RoadGraph, velocity: f32) -> Self {
+    pub fn new_on_road(car_id: Option<CarID>, road: RoadID, road_graph: &mut RoadGraph, velocity: f32, destination: NodeID) -> Self {
 
-        // this is the first point of the road.
-        let position = road_graph[road].points[0];
-        // safe because for a road to exist it must have at least 2 points.
-        let next_pos = road_graph[road].points[1];
+        let points = &road_graph[road].points;
+    
+        let (start, next) = (points[0], points[1]);
+        let dir = (next - start).normalize_or_zero();
+    
+        // Offset spawn to be 0.0–10.0 units into the segment
+        let offset = random_range(0.0..10.0);
+        let position = start + dir * offset;
+        let heading = dir.to_angle();
+    
+        let width = 5.0;
+        let height = 15.0;
+        let center = Vec2 { x: width / 2.0, y: height / 2.0 };
+    
+        let car_id = car_id.unwrap_or(CarID::new_rand());
 
+        road_graph[road].num_vehicles_on += 1;
 
+        road_graph[road].vehicles_on.push(car_id);
 
-        // the heading should be the angle needed to point from the first point to the second,
-        // which ends up being the unit vector of both x y vectors. 
-        // this is included in the Vec2 struct as Normalize()
+        
+        let mut rng = rng();
 
-        let heading = (next_pos - position).normalize_or_zero().to_angle();
-        let width= 5.0;
-        let height= 15.0;
-        let center = Vec2 { x: width / 2.0, y: height / 2.0 }; 
-
-        road_graph[road].vehicles_on += 1;
-
-        Car { 
+        let (r, g, b, a) = (
+            rng.random_range(0.0..=255.0) as u8,
+            rng.random_range(0.0..=255.0) as u8,
+            rng.random_range(0.0..=255.0) as u8,
+            255,
+        );
+    
+        Car {
             position,
             velocity,
             acceleration: Vec2::ZERO,
-            car_id: CarID::new_rand(),
+            car_id,
             current_road: road,
             width,
             height,
-            center, 
+            center,
             heading,
             segment_index: 0,
             path: Vec::new(),
-         }
-
-
+            color: (r, g, b, a),
+            destination,
+        }
     }
+    
 
 
+    pub fn get_color(&self) -> (u8,u8,u8,u8) {
+        self.color
+    }
 
     pub fn get_direction(&self) -> f32 {
         self.heading
@@ -246,6 +269,10 @@ impl Car {
 
     pub fn get_id(&self) -> CarID {
         self.car_id
+    }
+
+    pub fn get_path(&self) -> Vec<RoadID> {
+        self.path.clone()
     }
 
     pub fn rotate_car(&mut self, rotation: f32) {
@@ -339,6 +366,7 @@ impl Car {
         } else if distance_to_target <= 0.001 { // Already at (or very close to) the target
             self.position = segment_target_point; // Snap for precision
             self.segment_index += 1;
+
             if self.segment_index >= points.len() - 1 {
                 return true; // Done with road
             } else {
@@ -371,9 +399,9 @@ impl Car {
     /// Moves car from starting road to inputted destination
     /// 
     /// Uses the A* algorithm 
-    pub fn move_car_to_destination(&mut self, road_graph: &RoadGraph, destination: NodeID, dt: f32, debug: bool) {
+    pub fn move_car_to_destination(&mut self, road_graph: &mut RoadGraph, destination: NodeID, dt: f32, debug: bool) {
         // check if car done with its own road
-        let done = self.move_car_on_road(dt, road_graph);
+        let done = self.move_car_on_road(dt, &road_graph);
 
         if debug {
             println!(
@@ -409,7 +437,7 @@ impl Car {
             }
     
             let start_node = road.to.id;
-            self.path = a_star(start_node, destination, road_graph, debug);
+            self.path = a_star(start_node, destination, &road_graph, debug);
     
             if debug {
                 println!("📍 Rerouted from node {:?} to {:?}, path: {:?}", start_node, destination, self.path);
@@ -420,12 +448,21 @@ impl Car {
             }
         }
     
-        // Moves to next road in path if exists. This is the only function that can move cars to different roads. 
+        // Moves to next road in path if exists. This is the only part of any function that can move cars to different roads. 
         if done {
             if let Some(next_road) = self.path.first().copied() {
                 self.path.remove(0);
+
+                road_graph[self.current_road].vehicles_on.retain(|x| *x != self.car_id);
+                road_graph[self.current_road].num_vehicles_on -= 1;
+
+
                 self.current_road = next_road;
+                road_graph[self.current_road].vehicles_on.push(self.car_id);
+                road_graph[next_road].num_vehicles_on += 1;
+
                 self.segment_index = 0;
+
     
                 let new_road = &road_graph[self.current_road];
                 let points = &new_road.points;
@@ -434,7 +471,7 @@ impl Car {
                 if dist_to_start < 2.0 {
                     self.position = points[0]; // Snap to road start
                 } else {
-                    println!("❌ Car jumped to road {:?} with dist {:.2}. Rejecting.", self.current_road, dist_to_start);
+                    if debug {println!("❌ Car jumped to road {:?} with dist {:.2}. Rejecting.", self.current_road, dist_to_start)};
                     self.path.clear(); // Invalidate bad path
                     return;
                 }
@@ -452,41 +489,4 @@ impl Car {
     
 }
     
-    
-        
 
-    
-
-
-
-
-pub struct CarList {
-    cars: Vec<Car>,
-}
-
-impl CarList {
-    pub fn new(cars: Vec<Car>) -> Self {
-        CarList { cars }
-    }
-    pub fn add_car(&mut self, car: Car) {
-        self.cars.push(car);
-    }
-    pub fn remove_car(&mut self, car_id: CarID) {
-        self.cars.retain(|car| car.car_id != car_id)
-    }
-    pub fn get_cars(&self) -> &Vec<Car> {
-        &self.cars
-    }
-    pub fn get_cars_mut(&mut self) ->&mut Vec<Car> {
-        &mut self.cars
-    }
-}
-
-impl <'a>IntoIterator for &'a mut CarList {
-    type Item = &'a mut Car;
-    type IntoIter = std::slice::IterMut<'a, Car>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.cars.iter_mut()
-    }
-}

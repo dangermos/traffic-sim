@@ -1,0 +1,13 @@
+Get roads aware of cars on its own road, for rendering and advanced pathfinding
+
+Bezier curves for smoothing
+
+Visual appeal and ease of view
+
+Clean code for 0 compiler warnings
+
+Mix dotted line colors for visuaization of what cars are taking what paths ||| Done
+
+- Requires roads to track what cars are pn, might change signature to use carId instead of the
+actual object car, but this also means i need a global way to get to the car using just the id, like
+how i can access road_graph using a distinct nodeid or carid. It would proabbly not vven be that bad to make the roadgraph also know that cars are on it. Could just be the global logic object, since everything is hashed nayways its fast loookup for objects. ||| Done

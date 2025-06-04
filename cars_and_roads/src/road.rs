@@ -3,6 +3,8 @@ use std::{collections::HashMap, ops::{Index, IndexMut}};
 use macroquad::{math::{Vec2}};
 use rand::Rng;
 
+use crate::{Car, CarID};
+
 
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Default)]
@@ -56,7 +58,8 @@ pub struct Road {
     pub to: Node,
     pub length: f32,
     pub capacity: i32,
-    pub vehicles_on: i32,
+    pub vehicles_on: Vec<CarID>,
+    pub num_vehicles_on: i32,
     pub speed_limit: f32,
     pub one_way: bool,
     pub traffic_density: f32,
@@ -110,8 +113,8 @@ fn make_points(curves: i32, from_node: Node, to_node: Node) -> Vec<Vec2> { // As
 impl Road {
     pub fn new_road(id: RoadID, from: Node, to: Node, capacity: i32, speed_limit: f32) -> Self{
 
-        let vehicles_on = 0;
-        let density = vehicles_on as f32 / capacity as f32;
+        let num_vehicles_on = 0;
+        let density = num_vehicles_on as f32 / capacity as f32;
         let length = from.position.distance(to.position);
 
         let one_way = rand::rng().random_range(1..=1000) < 200;
@@ -134,7 +137,8 @@ impl Road {
             to,
             length,
             capacity,
-            vehicles_on,
+            vehicles_on: Vec::new(),
+            num_vehicles_on,
             speed_limit,
             one_way,
             points,
@@ -145,8 +149,8 @@ impl Road {
     pub fn new_road_with_curves(id: RoadID, from: Node, to: Node, capacity: i32, speed_limit: f32, curves: i32) 
     -> Self {
 
-        let vehicles_on = 0;
-        let density = vehicles_on as f32 / capacity as f32;
+        let num_vehicles_on = 0;
+        let density = num_vehicles_on as f32 / capacity as f32;
         let length = from.position.distance(to.position);
 
         let one_way = rand::rng().random_range(1..=1000) < 200;
@@ -168,7 +172,8 @@ impl Road {
             to,
             length,
             capacity,
-            vehicles_on,
+            vehicles_on: Vec::new(),
+            num_vehicles_on,
             speed_limit,
             one_way,
             points,
@@ -177,26 +182,27 @@ impl Road {
     }
 }
 
+#[derive(Debug, Clone)]
 /// A RoadGraph has an array representation of all the roads and nodes inserted into it.
 /// 
 /// It should also have an underlying Directed Graph for pathfinding algorithms.
 pub struct RoadGraph {
     roads: Vec<Road>,
     nodes: Vec<Node>,
+    cars:  Vec<Car>,
     pub adjacency: HashMap<NodeID, Vec<(NodeID, RoadID)>>,
 }
 
 
 impl RoadGraph {
     /// Initialize a RoadGraph
-    /// Takes an array of roads
+    /// Takes an array of roads, nodes, and cars
     
     pub fn new(roads: Option<Vec<Road>>, nodes: Option<Vec<Node>>) -> Self {
 
         let roads = roads.unwrap_or_default();
         let nodes = nodes.unwrap_or_default();
-        
-
+    
 
         let mut adjacency: HashMap<NodeID, Vec<(NodeID, RoadID)>> = HashMap::new();
 
@@ -210,12 +216,13 @@ impl RoadGraph {
                 .push((road.to.id, road.id)); // to (NodeID, using RoadID)
          }
         
-        println!("adj: {:?}", adjacency);
+        //println!("adj: {:?}", adjacency);
 
         RoadGraph {
             roads,
             nodes,
             adjacency,
+            cars: Vec::new(),
         }
     }
     
@@ -244,6 +251,18 @@ impl RoadGraph {
         &self.nodes
     }
 
+    pub fn add_car(&mut self, car: Car) {
+        self.cars.push(car);
+    }
+
+    pub fn remove_car(&mut self, id: CarID) {
+        self.cars.retain_mut(|car| car.get_id() != id);
+    }
+
+    pub fn get_cars(&self) -> &Vec<Car> {
+        &self.cars
+    }
+
     pub fn get_adjacency(&self) -> HashMap<NodeID, Vec<(NodeID, RoadID)>>{
         self.adjacency.clone()
     }
@@ -262,7 +281,6 @@ impl<'a> IntoIterator for &'a RoadGraph {
     }
 }
 
-
 impl Index<RoadID> for RoadGraph {
     type Output = Road;
     fn index(&self, index: RoadID) -> &Self::Output {
@@ -271,6 +289,7 @@ impl Index<RoadID> for RoadGraph {
                     .expect(&format!("ID {:?} Not Found", index))
     }
 }
+
 impl Index<NodeID> for RoadGraph {
     type Output = Node;
     fn index(&self, index: NodeID) -> &Self::Output {
@@ -280,13 +299,16 @@ impl Index<NodeID> for RoadGraph {
     }
 }
 
-
-
-
-
+impl Index<CarID> for RoadGraph {
+    type Output = Car;
+    fn index(&self, index: CarID) -> &Self::Output {
+        self.cars.iter()
+                    .find(|car| car.get_id() == index)
+                    .expect("ID Not Found")
+    }
+}
 
 impl IndexMut<RoadID> for RoadGraph {
-
     fn index_mut(&mut self, index: RoadID) -> &mut Self::Output {
         self.roads.iter_mut()
         .find(|road| road.id == index)
@@ -299,6 +321,14 @@ impl IndexMut<NodeID> for RoadGraph {
         self.nodes.iter_mut()
         .find(|node| node.id == index)
         .expect("ID Not Found")
+    }
+}
+
+impl IndexMut<CarID> for RoadGraph {
+    fn index_mut(&mut self, index: CarID) -> &mut Self::Output {
+        self.cars.iter_mut()
+                    .find(|car| car.get_id() == index)
+                    .expect("ID Not Found")
     }
 }
 

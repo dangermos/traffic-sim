@@ -1,6 +1,6 @@
-use cars_and_roads::{draw_circle, draw_line, draw_text, draw_triangle, road::Node, Car, Color, Road, Vec2, BLUE, PURPLE, RED, WHITE, PINK};
+use cars_and_roads::{draw_circle, draw_line, draw_text, draw_triangle, road::Node, Car, CarID, Color, Road, RoadGraph, Vec2, Vec4, BLUE, PINK, PURPLE, RED, WHITE};
 
-pub fn draw_car(car: &Car, color: Color, debug: bool) {
+pub fn draw_car(car: &Car, debug: bool) {
 
     let width = car.get_width();
     let height = car.get_height();
@@ -8,6 +8,16 @@ pub fn draw_car(car: &Car, color: Color, debug: bool) {
     let angle_rad = car.get_direction() - std::f32::consts::FRAC_PI_2;
     let half_w = width / 2.0;
     let half_h = height / 2.0;
+
+    let (r,g,b,a) = car.get_color();
+
+
+    let color = Color::from_rgba(r,g,b,a);
+    
+    if debug {
+        println!("Car color is {:?}\nfrom rgba values {:?}", color, (r,g,b,a));
+    }
+
 
     // Define the rectangle corners relative to center
     let corners = [
@@ -39,7 +49,7 @@ pub fn draw_car(car: &Car, color: Color, debug: bool) {
         let tip = start + direction * arrow_length;
     
         // Draw the main arrow shaft
-        draw_line(start.x, start.y, tip.x, tip.y, 2.0, PURPLE);
+        draw_line(start.x, start.y, tip.x, tip.y, 2.0, color);
     
         // Compute arrowhead triangle base corners
         let perp = Vec2::new(-direction.y, direction.x); // 90° rotated vector
@@ -47,24 +57,102 @@ pub fn draw_car(car: &Car, color: Color, debug: bool) {
         let left = base + perp * tip_size;
         let right = base - perp * tip_size;
     
-        draw_triangle(tip, left, right, PURPLE);
-    }
-    
-    
+        draw_triangle(tip, left, right, color);
 
+    }
     
 
 }
 
-pub fn draw_road(road: &Road) {
+pub fn mix_colors(colors: Vec<(u8, u8, u8, u8)>) -> Option<(u8, u8, u8, u8)> {
 
-    let color = if road.one_way {PINK} else {WHITE};
+    let len = colors.len() as u32;
 
+    if colors.is_empty() {
+        return None;
+    }
 
-    for pair in road.points.windows(2) {
-        draw_line(pair[0].x, pair[0].y, pair[1].x, pair[1].y, 4.0, color);
+    let mut sum_r: u32 = 0;
+    let mut sum_g: u32 = 0;
+    let mut sum_b: u32 = 0;
+    let mut sum_a: u32 = 0;
+
+    for (r, g, b, a) in colors {
+        sum_r += r as u32;
+        sum_g += g as u32;
+        sum_b += b as u32;
+        sum_a += a as u32;
+    }
+
+    let avg_r = (sum_r / len) as u8;
+    let avg_g = (sum_g / len) as u8;
+    let avg_b = (sum_b / len) as u8;
+    let avg_a = (sum_a / len) as u8;
+
+    Some((avg_r, avg_g, avg_b, avg_a))
+}
+
+pub fn draw_roads(road_graph: &mut RoadGraph, debug: bool) -> () {
+
+    for road in road_graph.get_roads() {
+        let color = if road.one_way {PINK} else {WHITE};
+
+        for pair in road.points.windows(2) {
+
+            let (x1, y1, x2, y2) = (pair[0].x, pair[0].y, pair[1].x, pair[1].y);
+            draw_line(x1, y1, x2, y2, 4.0, color);
+            if debug {
+                let text = format!("Cars {:?} are on this Road", road_graph.get_cars().iter().map(|car| car.get_id()).collect::<Vec<CarID>>());
+                draw_text(&text,  (x1 + x2) / 2.0, ((y1 + y2) / 2.0) - 100.0, 14.0, color);
+            }
+        }
+        
     }
 }
+
+pub fn draw_dotted_line(road: &Road, road_graph: &mut RoadGraph, debug: bool) {
+    let segment_length = 10.0;
+    let spacing = 5.0;
+
+    // Mix all car‐colors once
+    let color = mix_colors(
+        road_graph
+            .get_cars()
+            .iter()
+            .map(|car| car.get_color())
+            .collect(),
+    );
+    let (r, g, b, a) = color.unwrap_or_default();
+
+    let points = &road.points;
+
+    // Iterate over each consecutive pair in `road.points`
+    for window in points.windows(2) {
+        let from = window[0];
+        let to = window[1];
+
+        let direction = (to - from).normalize();
+        let distance = from.distance(to);
+        let mut pos = from;
+
+        let step = direction * (segment_length + spacing);
+        let num_dots = (distance / (segment_length + spacing)).floor() as usize;
+
+        for _ in 0..num_dots {
+            let end = pos + direction * segment_length;
+            draw_line(
+                pos.x,
+                pos.y,
+                end.x,
+                end.y,
+                5.0,
+                Color::from_rgba(r, g, b, a),
+            );
+            pos += step;
+        }
+    }
+}
+
 
 pub fn draw_node(node: &Node, debug: bool) {
     draw_circle(node.position.x, node.position.y, 2.0, RED);
