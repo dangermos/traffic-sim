@@ -18,7 +18,7 @@ async fn main() {
 
     // let level = Level::sim1();
 
-     let level = Level::sim_roundabout();
+     let level = Level::sim_roundabout("pc".to_string());
 
     //let level = Level::sim1();
 
@@ -33,29 +33,29 @@ async fn main() {
 
         draw_fps();
         
-        draw_roads(&mut road_graph, true);
+        draw_roads(&mut road_graph, false);
 
         let roads = road_graph.get_roads().to_vec();
         roads.iter().for_each(|x| draw_dotted_line(x, &mut road_graph, false));
         
-        road_graph.get_nodes().iter().for_each(|x| draw_node(x, true));
+        road_graph.get_nodes().iter().for_each(|x| draw_node(x, false));
         
         
         
         let frame_time = get_frame_time();
 
 
-        cars.iter().for_each(|car| println!("color: {:?}", car.get_color()));
+        //cars.iter().for_each(|car| println!("color: {:?}", car.get_color()));
 
         //cars.par_iter_mut().for_each(|car| {car.move_car_to_destination(&mut road_graph, car.destination, frame_time * 20.0, true);});   
-        cars.iter_mut().for_each(|car| {car.move_car_to_destination(&mut road_graph, car.destination, frame_time * 20.0, true);});
+        cars.iter_mut().for_each(|car| {car.move_car_to_destination(&mut road_graph, car.destination, frame_time * 20.0, false);});
 
 
         
         cars.iter().for_each(
             |x | {
-                draw_car(x, true);
-                println!("path: {:?}", x.get_path());
+                draw_car(x, false);
+                //println!("path: {:?}", x.get_path());
             }
             
         );

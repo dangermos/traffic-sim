@@ -40,10 +40,10 @@ pub struct Level {
 
 impl Level {
 
-    pub fn sim1() -> Self {
+    pub fn sim1(device: String) -> Self {
 
-    let screen_width: f32 = 1920.0;
-    let screen_height: f32 = 1200.0;
+    let screen_width = if device == "laptop" {1920.0} else {1200.0};
+    let screen_height = if device == "laptop" {1200.0} else {1920.0};
 
     println!("Width: {}\nHeight: {}", screen_width, screen_height);
 
@@ -87,9 +87,9 @@ impl Level {
     }
 
 
-    pub fn sim2() -> Self {
-        let screen_width: f32 = 1920.0;
-        let screen_height: f32 = 1200.0;
+    pub fn sim2(device: String) -> Self {
+        let screen_width = if device == "laptop" {1920.0} else {1200.0};
+        let screen_height = if device == "laptop" {1200.0} else {1920.0};
         let center = Vec2 { x: screen_width / 2.0, y: screen_height / 2.0 };
 
         println!("Width: {}\nHeight: {}", screen_width, screen_height);
@@ -189,9 +189,11 @@ impl Level {
         Level { road_graph }
     }
 
-    pub fn sim_roundabout() -> Level {
-        let screen_width = 1920.0;
-        let screen_height = 1200.0;
+    pub fn sim_roundabout(device: String) -> Level {
+
+        let screen_width = if device == "laptop" {1920.0} else {1200.0};
+        let screen_height = if device == "laptop" {1200.0} else {1920.0};
+
         let center = Vec2::new(screen_width / 2.0, screen_height / 2.0);
         let radius = 200.0;
     
