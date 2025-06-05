@@ -38,14 +38,16 @@ impl PartialOrd for State {
 
 
 
-pub fn a_star(start_node: NodeID, goal_node: NodeID, graph: &RoadGraph, debug: bool) -> Vec<RoadID> {
+pub fn a_star(start_node: NodeID, goal_node: NodeID, road_graph: &RoadGraph, debug: bool) -> Vec<RoadID> {
     
     let mut open = BinaryHeap::new();
     let mut came_from: HashMap<NodeID, NodeID> = HashMap::new();
     let mut cost_so_far: HashMap<NodeID, f32> = HashMap::new();
 
-    let goal_pos = graph[goal_node].position;
-    let start_pos = graph[start_node].position;
+
+
+    let start_pos = road_graph.get_nodes().get(&start_node).unwrap().position;
+    let goal_pos = road_graph.get_nodes().get(&goal_node).unwrap().position;
 
     open.push(State::new(
         start_node,
@@ -75,7 +77,7 @@ pub fn a_star(start_node: NodeID, goal_node: NodeID, graph: &RoadGraph, debug: b
             for win in node_path.windows(2) {
                 let from = win[0];
                 let to = win[1];
-                if let Some(edges) = graph.adjacency.get(&from) {
+                if let Some(edges) = road_graph.adjacency.get(&from) {
                     if let Some(&(_, road_id)) = edges.iter().find(|&&(n, _)| n == to) {
                         road_path.push(road_id);
                     } else if debug {
@@ -92,12 +94,12 @@ pub fn a_star(start_node: NodeID, goal_node: NodeID, graph: &RoadGraph, debug: b
             return road_path;
         }
 
-        if let Some(neighbors) = graph.adjacency.get(&current) {
+        if let Some(neighbors) = road_graph.adjacency.get(&current) {
             for &(neighbor, road_id) in neighbors {
-                let road = &graph[road_id];
+                let road = road_graph.get_roads().get(&road_id).unwrap().read().unwrap();
                 if road.one_way {
                     let dir = (road.to.position - road.from.position).normalize();
-                    let travel = (graph[neighbor].position - graph[current].position).normalize();
+                    let travel = (road_graph.get_nodes().get(&neighbor).unwrap().position - road_graph.get_nodes().get(&current).unwrap().position).normalize();
                     if dir.dot(travel) <= 0.0 {
                         continue; // wrong direction
                     }
@@ -112,7 +114,7 @@ pub fn a_star(start_node: NodeID, goal_node: NodeID, graph: &RoadGraph, debug: b
                 if new_cost < *cost_so_far.get(&neighbor).unwrap_or(&f32::INFINITY) {
                     cost_so_far.insert(neighbor, new_cost);
                     came_from.insert(neighbor, current);
-                    let est = new_cost + graph[neighbor].position.distance(goal_pos);
+                    let est = new_cost + road_graph.get_nodes().get(&neighbor).unwrap().position.distance(goal_pos);
                     open.push(State::new(neighbor, cost, est));
                 }
             }
@@ -131,7 +133,7 @@ pub fn a_star(start_node: NodeID, goal_node: NodeID, graph: &RoadGraph, debug: b
 
 
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct CarID (pub i32);
 
 
@@ -198,10 +200,14 @@ impl Car {
     /// Spawns a car on the specified road of a RoadGraph.
     pub fn new_on_road(car_id: Option<CarID>, road: RoadID, road_graph: &mut RoadGraph, velocity: f32, destination: NodeID) -> Self {
 
-        let points = &road_graph[road].points;
+        let road_arc = road_graph.get_roads().get(&road).unwrap();
+        let real_road = road_arc.read().unwrap();
+        let points = &real_road.points;
     
         let (start, next) = (points[0], points[1]);
         let dir = (next - start).normalize_or_zero();
+
+        drop(real_road); // because road_arc will later be written to, just a safety check
     
         // Offset spawn to be 0.0–10.0 units into the segment
         let offset = random_range(0.0..10.0);
@@ -214,9 +220,11 @@ impl Car {
     
         let car_id = car_id.unwrap_or(CarID::new_rand());
 
-        road_graph[road].num_vehicles_on += 1;
 
-        road_graph[road].vehicles_on.push(car_id);
+        let mut dyn_road = road_arc.write().unwrap();
+        dyn_road.num_vehicles_on += 1;
+        dyn_road.vehicles_on.push(car_id);
+
 
         
         let mut rng = rng();
@@ -291,7 +299,7 @@ impl Car {
     // In Car impl:
     pub fn move_car_on_road(&mut self, dt: f32, road_graph: &RoadGraph) -> bool {
 
-        let road = &road_graph[self.current_road];
+        let road = road_graph.get_roads().get(&self.current_road).unwrap().read().unwrap();
         let points = &road.points;
 
         const MIN_SEGMENT_LENGTH_FOR_HEADING_SQ: f32 = 0.01; 
@@ -300,7 +308,11 @@ impl Car {
         if points.len() < 2 {
             return true; // Cannot form a segment, consider it "done".
         }
-        
+
+        if self.segment_index >= points.len() {
+            panic!("🚨 Invalid segment_index {} for road with {} points!", self.segment_index, points.len()); // bail or clamp
+        }
+
         if self.segment_index >= points.len() - 1 {
             // Already at the end of the last segment.
             if !points.is_empty() {
@@ -399,10 +411,13 @@ impl Car {
     /// Moves car from starting road to inputted destination
     /// 
     /// Uses the A* algorithm 
-    pub fn move_car_to_destination(&mut self, road_graph: &mut RoadGraph, destination: NodeID, dt: f32, debug: bool) {
+    pub fn move_car_to_destination(&mut self, road_graph: &RoadGraph, dt: f32, debug: bool) {
+
+        let destination = self.destination;
+
         // check if car done with its own road
         let done = self.move_car_on_road(dt, &road_graph);
-
+        let curr_road = road_graph.get_roads().get(&self.current_road).unwrap().read().unwrap();
         if debug {
             println!(
             "[Step] ID: {:?} | Pos: {:.1},{:.1} | Seg: {} / {}",
@@ -410,15 +425,15 @@ impl Car {
             self.position.x,
             self.position.y,
             self.segment_index,
-            road_graph[self.current_road].points.len() - 1
+            curr_road.points.len() - 1
             ); 
         }
     
         // Car is at end of road, and destination.id matches current_road.end.id
 
         if self.path.is_empty()
-            && self.segment_index >= road_graph[self.current_road].points.len() - 1
-            && road_graph[self.current_road].to.id == destination
+            && self.segment_index >= curr_road.points.len() - 1
+            && curr_road.to.id == destination
         {
             if debug {
                 println!("✅ Fully arrived at destination {:?}", destination);
@@ -429,14 +444,14 @@ impl Car {
         // Runs A* again when road is finished.
         // Can potentially be modified to provide on-the-fly rerouting, as in it will suggest another road before car finishes its own.
         if self.path.is_empty() {
-            let road = &road_graph[self.current_road];
+            
     
-            if self.segment_index < road.points.len() - 1 {
+            if self.segment_index < curr_road.points.len() - 1 {
                 // Still moving on current road, wait before routing
                 return;
             }
     
-            let start_node = road.to.id;
+            let start_node = curr_road.to.id;
             self.path = a_star(start_node, destination, &road_graph, debug);
     
             if debug {
@@ -447,24 +462,34 @@ impl Car {
                 self.path.remove(0);
             }
         }
-    
+        drop(curr_road);
+
         // Moves to next road in path if exists. This is the only part of any function that can move cars to different roads. 
         if done {
             if let Some(next_road) = self.path.first().copied() {
-                self.path.remove(0);
+                let mut curr_road = road_graph.get_roads().get(&self.current_road).unwrap().write().unwrap();
 
-                road_graph[self.current_road].vehicles_on.retain(|x| *x != self.car_id);
-                road_graph[self.current_road].num_vehicles_on -= 1;
+                {self.path.remove(0);
+
+                curr_road.vehicles_on.retain(|x| *x != self.car_id);
+                curr_road.num_vehicles_on -= 1;}
+
+                drop(curr_road);
+
 
 
                 self.current_road = next_road;
-                road_graph[self.current_road].vehicles_on.push(self.car_id);
-                road_graph[next_road].num_vehicles_on += 1;
+
+                let mut curr_road = road_graph.get_roads().get(&self.current_road).unwrap().write().unwrap();
+
+
+                curr_road.vehicles_on.push(self.car_id);
+                curr_road.num_vehicles_on += 1;
 
                 self.segment_index = 0;
 
     
-                let new_road = &road_graph[self.current_road];
+                let new_road = curr_road;
                 let points = &new_road.points;
     
                 let dist_to_start = (points[0] - self.position).length();

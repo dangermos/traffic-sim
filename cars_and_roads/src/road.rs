@@ -1,9 +1,9 @@
-use std::{collections::HashMap, ops::{Index, IndexMut}};
+use std::{collections::HashMap, sync::{Arc, RwLock}};
 
 use macroquad::{math::{Vec2}};
 use rand::Rng;
 
-use crate::{Car, CarID};
+use crate::{road, Car, CarID};
 
 
 
@@ -22,8 +22,6 @@ impl From<NodeID> for i32 {
     }
 }
 
-
-
 impl ToString for NodeID {
     fn to_string(&self) -> String {
         self.0.to_string()
@@ -34,6 +32,12 @@ impl ToString for NodeID {
 pub struct Node {
     pub id: NodeID,
     pub position: Vec2,
+}
+
+impl Default for Node {
+    fn default() -> Self {
+        Node::new_node(NodeID(0), Vec2::ZERO)
+    }
 }
 
 impl Node {
@@ -108,10 +112,43 @@ fn make_points(curves: i32, from_node: Node, to_node: Node) -> Vec<Vec2> { // As
     intermediate_points
 }
 
+/// Generates 4 control points for a Bezier curve between start and end.
+pub fn generate_bezier(start: Vec2, end: Vec2, curviness: f32) -> [Vec2; 4] {
+    let dir = (end - start).normalize();
+    let normal = Vec2::new(-dir.y, dir.x);
 
+    let control1 = start + dir * 0.25 + normal * curviness;
+    let control2 = start + dir * 0.75 - normal * curviness;
+
+    [start, control1, control2, end]
+}
+
+pub fn bezier_point(points: [Vec2; 4], t: f32) -> Vec2 {
+    let [p0, p1, p2, p3] = points;
+    let u = 1.0 - t;
+    u.powi(3) * p0 +
+    3.0 * u.powi(2) * t * p1 +
+    3.0 * u * t.powi(2) * p2 +
+    t.powi(3) * p3
+}
+
+pub fn sample_bezier(points: [Vec2; 4], steps: usize) -> Vec<Vec2> {
+    (0..=steps)
+        .map(|i| {
+            let t = i as f32 / steps as f32;
+            bezier_point(points, t)
+        })
+        .collect()
+}
+
+impl Default for Road {
+    fn default() -> Self {
+        Road::new_road(RoadID(0), Node::default(), Node::default(), 0, 0.0)
+    }
+}
 
 impl Road {
-    pub fn new_road(id: RoadID, from: Node, to: Node, capacity: i32, speed_limit: f32) -> Self{
+    pub fn new_road(id: RoadID, from: Node, to: Node, capacity: i32, speed_limit: f32,) -> Self {
 
         let num_vehicles_on = 0;
         let density = num_vehicles_on as f32 / capacity as f32;
@@ -120,17 +157,10 @@ impl Road {
         let one_way = rand::rng().random_range(1..=1000) < 200;
 
 
-        let mut points: Vec<Vec2> = Vec::new();
-        points.push(from.position);
-
-        let num_curves = 3;
+        let control = generate_bezier(from.position, to.position, 10.0);
         
-        points.extend(make_points(num_curves, from, to));
-
-        points.push(to.position);
+        let points = sample_bezier(control, 30); // adjust step count for smoothness
         
-
-
         Road {
             id,
             from,
@@ -146,8 +176,7 @@ impl Road {
         }
     }
 
-    pub fn new_road_with_curves(id: RoadID, from: Node, to: Node, capacity: i32, speed_limit: f32, curves: i32) 
-    -> Self {
+    pub fn new_road_with_curves(id: RoadID, from: Node, to: Node, capacity: i32, speed_limit: f32, curviness: f32) -> Self {
 
         let num_vehicles_on = 0;
         let density = num_vehicles_on as f32 / capacity as f32;
@@ -156,13 +185,9 @@ impl Road {
         let one_way = rand::rng().random_range(1..=1000) < 200;
 
 
-        let mut points: Vec<Vec2> = Vec::new();
-        points.push(from.position);
+        let control = generate_bezier(from.position, to.position, curviness);
 
-        
-        points.extend(make_points(curves, from, to));
-
-        points.push(to.position);
+        let points = sample_bezier(control, 50); // adjust step count for smoothness
         
 
 
@@ -187,9 +212,9 @@ impl Road {
 /// 
 /// It should also have an underlying Directed Graph for pathfinding algorithms.
 pub struct RoadGraph {
-    roads: Vec<Road>,
-    nodes: Vec<Node>,
-    cars:  Vec<Car>,
+    roads: HashMap<RoadID, Arc<RwLock<Road>>>,
+    nodes: HashMap<NodeID, Node>,
+    cars:  HashMap<CarID, Arc<RwLock<Car>>>,
     pub adjacency: HashMap<NodeID, Vec<(NodeID, RoadID)>>,
 }
 
@@ -200,16 +225,33 @@ impl RoadGraph {
     
     pub fn new(roads: Option<Vec<Road>>, nodes: Option<Vec<Node>>) -> Self {
 
-        let roads = roads.unwrap_or_default();
-        let nodes = nodes.unwrap_or_default();
+        let mut road_map: HashMap<RoadID, Arc<RwLock<Road>>> = HashMap::new();
+        let temp_roads = roads.unwrap_or_default();
+
+        for road in temp_roads {
+            road_map.insert(road.id, Arc::new(RwLock::new(road)));
+        }
+
+        let roads = road_map;
+
+
+        let mut node_map: HashMap<NodeID, Node> = HashMap::new();
+
+        let temp_nodes = nodes.unwrap_or_default();
+
+        for node in temp_nodes {
+            node_map.insert(node.id, node);
+        }
+
+        let nodes = node_map;
     
 
         let mut adjacency: HashMap<NodeID, Vec<(NodeID, RoadID)>> = HashMap::new();
 
-        // h.into_iter().for_each(|(key, val)| adjacency.insert(key, val); );
 
+        for (_id, road_arc) in &roads {
+            let road = road_arc.read().unwrap();
 
-         for road in &roads {
             adjacency
                 .entry(road.from.id) // from NodeID
                 .or_default()
@@ -218,50 +260,68 @@ impl RoadGraph {
         
         //println!("adj: {:?}", adjacency);
 
+
+        let cars: HashMap<CarID, Arc<RwLock<Car>>> = HashMap::new();
+
+
         RoadGraph {
             roads,
             nodes,
             adjacency,
-            cars: Vec::new(),
+            cars,
         }
+
     }
     
 
     pub fn add_road(&mut self, road: Road) {
-        self.roads.push(road);
+        self.roads.insert(road.id, Arc::new(RwLock::new(road)));
     }
 
     pub fn remove_road(&mut self, id: RoadID) {
-        self.roads.retain_mut(|road| road.id != id);
+        self.roads.remove(&id);
     }
 
-    pub fn get_roads(&self) -> &Vec<Road> {
+    pub fn roads_to_iter(&self) -> impl Iterator<Item = &Arc<RwLock<Road>>> {
+        self.roads.values()
+    }
+
+    pub fn get_roads(&self) -> &HashMap<RoadID, Arc<RwLock<Road>>>{
         &self.roads
     }
 
     pub fn add_node(&mut self, node: Node) {
-        self.nodes.push(node);
+        self.nodes.insert(node.id, node);
     }
 
     pub fn remove_node(&mut self, id: NodeID) {
-        self.nodes.retain_mut(|node| node.id != id);
+        self.nodes.remove(&id);
     }
 
-    pub fn get_nodes(&self) -> &Vec<Node> {
+    pub fn nodes_to_iter(&self) -> impl Iterator<Item = &Node> {
+        self.nodes.values()
+    }
+
+    pub fn get_nodes(&self) -> &HashMap<NodeID, Node> {
         &self.nodes
     }
 
     pub fn add_car(&mut self, car: Car) {
-        self.cars.push(car);
+        self.cars.insert(car.get_id(), Arc::new(RwLock::new(car)));
     }
 
     pub fn remove_car(&mut self, id: CarID) {
-        self.cars.retain_mut(|car| car.get_id() != id);
+        self.cars.remove(&id);
     }
 
-    pub fn get_cars(&self) -> &Vec<Car> {
+    pub fn cars_to_iter(&self) -> impl Iterator<Item = &Arc<RwLock<Car>>> {
+        self.cars.values()
+    }
+
+    pub fn get_cars(&self) -> &HashMap<CarID, Arc<RwLock<Car>>> {
         &self.cars
     }
+
 
     pub fn get_adjacency(&self) -> HashMap<NodeID, Vec<(NodeID, RoadID)>>{
         self.adjacency.clone()
@@ -271,66 +331,6 @@ impl RoadGraph {
 
 }
 
-/// This allows RoadGraph to be iterated on multiple times, not consuming it.
-impl<'a> IntoIterator for &'a RoadGraph {
-    type Item = &'a Road;
-    type IntoIter = std::slice::Iter<'a, Road>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.roads.iter()
-    }
-}
-
-impl Index<RoadID> for RoadGraph {
-    type Output = Road;
-    fn index(&self, index: RoadID) -> &Self::Output {
-        self.roads.iter()
-                    .find(|road| road.id == index)
-                    .expect(&format!("ID {:?} Not Found", index))
-    }
-}
-
-impl Index<NodeID> for RoadGraph {
-    type Output = Node;
-    fn index(&self, index: NodeID) -> &Self::Output {
-        self.nodes.iter()
-                    .find(|node| node.id == index)
-                    .expect("ID Not Found")
-    }
-}
-
-impl Index<CarID> for RoadGraph {
-    type Output = Car;
-    fn index(&self, index: CarID) -> &Self::Output {
-        self.cars.iter()
-                    .find(|car| car.get_id() == index)
-                    .expect("ID Not Found")
-    }
-}
-
-impl IndexMut<RoadID> for RoadGraph {
-    fn index_mut(&mut self, index: RoadID) -> &mut Self::Output {
-        self.roads.iter_mut()
-        .find(|road| road.id == index)
-        .expect("ID Not Found")  
-    }
-}
-
-impl IndexMut<NodeID> for RoadGraph {
-    fn index_mut(&mut self, index: NodeID) -> &mut Self::Output {
-        self.nodes.iter_mut()
-        .find(|node| node.id == index)
-        .expect("ID Not Found")
-    }
-}
-
-impl IndexMut<CarID> for RoadGraph {
-    fn index_mut(&mut self, index: CarID) -> &mut Self::Output {
-        self.cars.iter_mut()
-                    .find(|car| car.get_id() == index)
-                    .expect("ID Not Found")
-    }
-}
 
 
 

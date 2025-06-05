@@ -1,13 +1,18 @@
-Get roads aware of cars on its own road, for rendering and advanced pathfinding
+Get roads aware of cars on its own road, for rendering and advanced pathfinding || TODO
 
-Bezier curves for smoothing
+Bezier curves for smoothing || Done
 
-Visual appeal and ease of view
+Visual appeal and ease of view || TODO
 
-Clean code for 0 compiler warnings
+Clean code for 0 compiler warnings || TODO
 
-Mix dotted line colors for visuaization of what cars are taking what paths ||| Done
+Mix dotted line colors for visuaization of what cars are taking what paths || Done
 
 - Requires roads to track what cars are pn, might change signature to use carId instead of the
 actual object car, but this also means i need a global way to get to the car using just the id, like
-how i can access road_graph using a distinct nodeid or carid. It would proabbly not vven be that bad to make the roadgraph also know that cars are on it. Could just be the global logic object, since everything is hashed nayways its fast loookup for objects. ||| Done
+how i can access road_graph using a distinct nodeid or carid. It would proabbly not vven be that bad to make the roadgraph also know that cars are on it. Could just be the global logic object, since everything is hashed nayways its fast loookup for objects. || Done
+
+
+Wrap Roads in an `Arc<RwLock<Road>>` because of multi-threaded access || Done
+
+Wrap Cars in an `Arc<RwLock<Car>>` same reason as above || Done

@@ -14,9 +14,7 @@ pub fn draw_car(car: &Car, debug: bool) {
 
     let color = Color::from_rgba(r,g,b,a);
     
-    if debug {
-        println!("Car color is {:?}\nfrom rgba values {:?}", color, (r,g,b,a));
-    }
+
 
 
     // Define the rectangle corners relative to center
@@ -59,6 +57,9 @@ pub fn draw_car(car: &Car, debug: bool) {
     
         draw_triangle(tip, left, right, color);
 
+        let id = format!("{:?}", car.get_id());
+        draw_text(&id, car.position.x, car.position.y - 10.0, 18.0, color);
+
     }
     
 
@@ -94,7 +95,10 @@ pub fn mix_colors(colors: Vec<(u8, u8, u8, u8)>) -> Option<(u8, u8, u8, u8)> {
 
 pub fn draw_roads(road_graph: &mut RoadGraph, debug: bool) -> () {
 
-    for road in road_graph.get_roads() {
+    for (_id, road) in road_graph.get_roads() {
+
+        let road = road.read().unwrap();
+
         let color = if road.one_way {PINK} else {WHITE};
 
         for pair in road.points.windows(2) {
@@ -102,7 +106,7 @@ pub fn draw_roads(road_graph: &mut RoadGraph, debug: bool) -> () {
             let (x1, y1, x2, y2) = (pair[0].x, pair[0].y, pair[1].x, pair[1].y);
             draw_line(x1, y1, x2, y2, 4.0, color);
             if debug {
-                let text = format!("Cars {:?} are on this Road", road_graph.get_cars().iter().map(|car| car.get_id()).collect::<Vec<CarID>>());
+                let text = format!("Cars {:?} are on this Road", road_graph.get_cars().iter().map(|(id, _car)| id).collect::<Vec<_>>());
                 draw_text(&text,  (x1 + x2) / 2.0, ((y1 + y2) / 2.0) - 100.0, 14.0, color);
             }
         }
@@ -119,7 +123,7 @@ pub fn draw_dotted_line(road: &Road, road_graph: &mut RoadGraph, debug: bool) {
         road_graph
             .get_cars()
             .iter()
-            .map(|car| car.get_color())
+            .map(|(_id, car)| car.read().unwrap().get_color())
             .collect(),
     );
     let (r, g, b, a) = color.unwrap_or_default();
@@ -152,7 +156,6 @@ pub fn draw_dotted_line(road: &Road, road_graph: &mut RoadGraph, debug: bool) {
         }
     }
 }
-
 
 pub fn draw_node(node: &Node, debug: bool) {
     draw_circle(node.position.x, node.position.y, 2.0, RED);

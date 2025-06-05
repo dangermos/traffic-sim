@@ -40,7 +40,7 @@ pub struct Level {
 
 impl Level {
 
-    pub fn sim1(device: String) -> Self {
+    pub fn sim1(device: String, num_cars: i32) -> Self {
 
     let screen_width = if device == "laptop" {1920.0} else {1200.0};
     let screen_height = if device == "laptop" {1200.0} else {1920.0};
@@ -57,10 +57,10 @@ impl Level {
     let node3: Node = Node::new_node(NodeID(3), Vec2 { x: center.x + 150.0, y: center.y - 300.0 });
     let node4: Node = Node::new_node(NodeID(4), Vec2 { x: center.x - 600.0, y: center.y - 400.0 });
 
-    let road1: Road = Road::new_road_with_curves(RoadID(0), node1, node2, 100, 60.0, 5);
+    let road1: Road = Road::new_road_with_curves(RoadID(0), node1, node2, 100, 60.0, 50.0);
     let road2: Road = Road::new_road(RoadID(1), node1, node3, 100, 60.0, );
     let road3: Road = Road::new_road(RoadID(2), node2, node3, 100, 60.0, );
-    let road4: Road = Road::new_road_with_curves(RoadID(3), node3, node4, 30, 65.0, 5);
+    let road4: Road = Road::new_road_with_curves(RoadID(3), node3, node4, 30, 65.0, 50.0);
 
 
     let mut road_graph: RoadGraph = RoadGraph::new(vec![road1, road2, road3, road4].into(), 
@@ -70,7 +70,6 @@ impl Level {
 
     adjacency_to_dot(&road_graph.get_adjacency());
 
-    let num_cars = 7;
 
     let cars: Vec<Car> = 
         (0..num_cars)
@@ -87,7 +86,7 @@ impl Level {
     }
 
 
-    pub fn sim2(device: String) -> Self {
+    pub fn sim2(device: String, num_cars: i32) -> Self {
         let screen_width = if device == "laptop" {1920.0} else {1200.0};
         let screen_height = if device == "laptop" {1200.0} else {1920.0};
         let center = Vec2 { x: screen_width / 2.0, y: screen_height / 2.0 };
@@ -103,11 +102,11 @@ impl Level {
 
         // === Roads ===
         let road_top_center = Road::new_road(RoadID(0), node_top, node_center, 100, 60.0);
-        let road_center_right = Road::new_road_with_curves(RoadID(1), node_center, node_right, 100, 60.0, 3);
+        let road_center_right = Road::new_road_with_curves(RoadID(1), node_center, node_right, 100, 60.0, 30.0);
         let road_right_bottom = Road::new_road(RoadID(2), node_right, node_bottom, 100, 60.0);
-        let road_bottom_center = Road::new_road_with_curves(RoadID(3), node_bottom, node_center, 100, 60.0, 3);
+        let road_bottom_center = Road::new_road_with_curves(RoadID(3), node_bottom, node_center, 100, 60.0, 30.0);
         let road_center_left = Road::new_road(RoadID(4), node_center, node_left, 100, 60.0);
-        let road_left_top = Road::new_road_with_curves(RoadID(5), node_left, node_top, 100, 60.0, 3);
+        let road_left_top = Road::new_road_with_curves(RoadID(5), node_left, node_top, 100, 60.0, 30.0);
 
         let mut road_graph = RoadGraph::new(
             vec![
@@ -125,7 +124,7 @@ impl Level {
 
         // === Cars using your syntax ===
         let cars: Vec<Car> = 
-            (0..6)
+            (0..num_cars)
                 .map(|i| {
                     // match the same goals as earlier sim2 for variety
                     let goals = [
@@ -136,7 +135,7 @@ impl Level {
                         NodeID(1), // top
                         NodeID(3), // bottom
                     ];
-                    Car::new_on_road(None, RoadID(i), &mut road_graph, 5.0, goals[i as usize])
+                    Car::new_on_road(Some(CarID(i)), RoadID(i % 5), &mut road_graph, 5.0, goals[(i as usize % goals.len()) as usize])
                 })
                 .collect();
 
@@ -146,10 +145,10 @@ impl Level {
         Level { road_graph }
     }   
 
-    pub fn sim3() -> Self {
+    pub fn sim3(num_cars: i32) -> Self {
 
-        let screen_width: f32 = 1920.0;
-        let screen_height: f32 = 1200.0;
+        let screen_width: f32 = 1080.0;
+        let screen_height: f32 = 1920.0;
         let center = Vec2 { x: screen_width / 2.0, y: screen_height / 2.0 };
 
         println!("Width: {}\nHeight: {}", screen_width, screen_height);
@@ -161,9 +160,9 @@ impl Level {
         let node_bot   = Node::new_node(NodeID(4), Vec2 { x: center.x + 300.0, y: center.y + 200.0 });
 
         // === Roads ===
-        let road_top = Road::new_road_with_curves(RoadID(0), node_start, node_top, 100, 55.0, 4);
+        let road_top = Road::new_road_with_curves(RoadID(0), node_start, node_top, 100, 55.0, 40.0);
         let road_mid = Road::new_road(RoadID(1), node_start, node_mid, 100, 55.0);
-        let road_bot = Road::new_road_with_curves(RoadID(2), node_start, node_bot, 100, 55.0, 4);
+        let road_bot = Road::new_road_with_curves(RoadID(2), node_start, node_bot, 100, 55.0, 40.0);
 
         let mut road_graph = RoadGraph::new(
             vec![road_top, road_mid, road_bot].into(),
@@ -172,13 +171,12 @@ impl Level {
 
         adjacency_to_dot(&road_graph.get_adjacency());
 
-        let num_cars = 3;
 
         let cars: Vec<Car> = {
         let goals = [NodeID(2), NodeID(3), NodeID(4)];
         
             (0..num_cars)
-                .map(|i| Car::new_on_road(None, RoadID(i), &mut road_graph, 5.0, goals[i as usize]))
+                .map(|i| Car::new_on_road(Some(CarID(i)), RoadID(i & 2), &mut road_graph, 10.0, goals[(i as usize % goals.len()) as usize]))
                 .collect()
             };
 
@@ -189,7 +187,7 @@ impl Level {
         Level { road_graph }
     }
 
-    pub fn sim_roundabout(device: String) -> Level {
+    pub fn sim_roundabout(device: String, num_cars: i32) -> Level {
 
         let screen_width = if device == "laptop" {1920.0} else {1200.0};
         let screen_height = if device == "laptop" {1200.0} else {1920.0};
@@ -225,13 +223,12 @@ impl Level {
     
         let mut road_graph = RoadGraph::new(Some(roads), Some(nodes));
     
-        const NUM_CARS: i32 = 5;
 
         let fin_nodes = [2, 1, 3];
         let speed = random_range(3.0..5.0);
 
         let cars: Vec<Car> = 
-                (0..=NUM_CARS)
+                (0..num_cars)
                 .into_iter()
                 .map(|x| Car::new_on_road(None, RoadID(0), &mut road_graph, speed, NodeID(fin_nodes[x as usize % fin_nodes.len()])))
                 .collect(); // N to E)
