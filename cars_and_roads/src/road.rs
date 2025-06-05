@@ -157,9 +157,9 @@ impl Road {
         let one_way = rand::rng().random_range(1..=1000) < 200;
 
 
-        let control = generate_bezier(from.position, to.position, 10.0);
+        let control = generate_bezier(from.position, to.position, 80.0);
         
-        let points = sample_bezier(control, 30); // adjust step count for smoothness
+        let points = sample_bezier(control, 50); // adjust step count for smoothness
         
         Road {
             id,

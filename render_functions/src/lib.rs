@@ -1,68 +1,61 @@
 use cars_and_roads::{draw_circle, draw_line, draw_text, draw_triangle, road::Node, Car, CarID, Color, Road, RoadGraph, Vec2, Vec4, BLUE, PINK, PURPLE, RED, WHITE};
 
 pub fn draw_car(car: &Car, debug: bool) {
-
     let width = car.get_width();
     let height = car.get_height();
 
-    let angle_rad = car.get_direction() - std::f32::consts::FRAC_PI_2;
+    let angle = car.get_direction() - std::f32::consts::FRAC_PI_2;
+    let (r, g, b, a) = car.get_color();
+    let color = Color::from_rgba(r, g, b, a);
+
+    let body_len = height * 0.7;
+    let roof_len = height * 0.3;
     let half_w = width / 2.0;
-    let half_h = height / 2.0;
 
-    let (r,g,b,a) = car.get_color();
+    let forward = Vec2::from_angle(angle);
+    let right = Vec2::new(-forward.y, forward.x); // 90° perp
 
+    let center = car.position;
+    let front = center + forward * (body_len / 2.0);
+    let rear = center - forward * (body_len / 2.0);
+    let roof_front = center + forward * (body_len / 2.0 - roof_len);
+    let roof_rear = center - forward * (body_len / 2.0 - roof_len);
 
-    let color = Color::from_rgba(r,g,b,a);
-    
-
-
-
-    // Define the rectangle corners relative to center
-    let corners = [
-        Vec2::new(-half_w, -half_h), // top-left
-        Vec2::new( half_w, -half_h), // top-right
-        Vec2::new( half_w,  half_h), // bottom-right
-        Vec2::new(-half_w,  half_h), // bottom-left
+    // Draw main body (larger rectangle)
+    let body_corners = [
+        rear - right * half_w,
+        rear + right * half_w,
+        front + right * half_w,
+        front - right * half_w,
     ];
 
-    // Rotate and translate each corner
-    let rotated: Vec<Vec2> = corners.iter().map(|p| {
-        let rotated_x = p.x * angle_rad.cos() - p.y * angle_rad.sin();
-        let rotated_y = p.x * angle_rad.sin() + p.y * angle_rad.cos();
-        car.position + Vec2::new(rotated_x, rotated_y)
-    }).collect();
+    draw_triangle(body_corners[0], body_corners[1], body_corners[2], color);
+    draw_triangle(body_corners[2], body_corners[3], body_corners[0], color);
 
-    // Draw it as two triangles
-    draw_triangle(rotated[0], rotated[1], rotated[2], color);
-    draw_triangle(rotated[2], rotated[3], rotated[0], color);
+    // Draw windshield / roof (smaller polygon)
+    let roof_corners = [
+        roof_rear - right * (half_w * 0.6),
+        roof_rear + right * (half_w * 0.6),
+        roof_front + right * (half_w * 0.4),
+        roof_front - right * (half_w * 0.4),
+    ];
+
+    let roof_color = Color::from_rgba(200, 200, 200, 200); // light grey roof
+    draw_triangle(roof_corners[0], roof_corners[1], roof_corners[2], roof_color);
+    draw_triangle(roof_corners[2], roof_corners[3], roof_corners[0], roof_color);
 
     if debug {
-        let direction = Vec2::from_angle(car.get_direction()).normalize();
-        let speed = car.velocity.max(1.0); // prevent scaling to zero
-    
-        let arrow_length = 15.0 + speed * 1.5; // total arrow length
-        let tip_size = 4.0 + speed * 0.4;      // size of the arrowhead
-    
-        let start = car.position;
-        let tip = start + direction * arrow_length;
-    
-        // Draw the main arrow shaft
-        draw_line(start.x, start.y, tip.x, tip.y, 2.0, color);
-    
-        // Compute arrowhead triangle base corners
-        let perp = Vec2::new(-direction.y, direction.x); // 90° rotated vector
-        let base = tip - direction * (tip_size + 2.0);   // back off from tip a bit
-        let left = base + perp * tip_size;
-        let right = base - perp * tip_size;
-    
-        draw_triangle(tip, left, right, color);
+        // Heading arrow
+        let dir = forward.normalize();
+        let tip = center + dir * 20.0;
+        let base = center + dir * 5.0;
+        let perp = Vec2::new(-dir.y, dir.x) * 4.0;
+        draw_line(center.x, center.y, tip.x, tip.y, 2.0, color);
+        draw_triangle(tip, base + perp, base - perp, color);
 
-        let id = format!("{:?}", car.get_id());
-        draw_text(&id, car.position.x, car.position.y - 10.0, 18.0, color);
-
+        // Car ID
+        draw_text(&format!("{:?}", car.get_id()), center.x, center.y - 10.0, 16.0, color);
     }
-    
-
 }
 
 pub fn mix_colors(colors: Vec<(u8, u8, u8, u8)>) -> Option<(u8, u8, u8, u8)> {

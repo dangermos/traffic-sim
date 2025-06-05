@@ -395,8 +395,10 @@ impl Car {
             // Car moves along the current segment but does not reach its end
             // Move using the segment's fixed direction (derived from current self.heading,
             // which should have been set when this segment was entered).
-            let move_direction = Vec2::from_angle(self.heading); // Assumes heading is correct for current segment
-            self.position += move_direction * travel_this_frame;
+
+            let direction = (segment_target_point - self.position).normalize_or_zero();
+            self.position += direction * travel_this_frame;
+            self.heading = direction.to_angle(); // Keep it fresh
             
             // self.heading = (segment_target_point - self.position).normalize_or_zero().to_angle();
             // will actually cause oscillations! 
